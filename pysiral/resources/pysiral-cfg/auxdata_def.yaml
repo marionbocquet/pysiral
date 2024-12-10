@@ -211,6 +211,18 @@ snow:
             subfolders: null
         source: None
 
+    snow_density_seasonal_fons:
+        pyclass: SeasonalSouthernSnowDensityFons2023
+        long_name: Seasonal changing Antarctic Snow density
+        local_repository: null
+        options:
+            snow_density_uncertainty: 50.
+            winter_density: 330.0
+            spring_density: 310.0
+            summer_density: 360.0
+            autumn_density: 350.0
+
+
     snow_density_seasonal_mallett:
         pyclass: SeasonalArcticSnowDensityMallett2020
         long_name: Seasonal changing Arctic Snow density

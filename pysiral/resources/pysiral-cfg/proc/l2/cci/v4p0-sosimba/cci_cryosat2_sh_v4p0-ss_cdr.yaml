@@ -43,19 +43,23 @@ auxdata:
     #         smooth_snow_depth: true
     #         smooth_filter_width_m: 25000.0
     #         exception_on_error: True
+    #   winter: 330.0  # TODO check
+    #   spring: 310.0
+    #   summer: 360.0
+    #   autumn: 350.0
+
     - snow:
          name: icdc_climatology_south
          options:
-             snow_density: 
-                winter: 330.0  # TODO check
-                spring: 310.0
-                summer: 360.0
-                autumn: 350.0
-             snow_density_uncertainty: 50. #TODO check
              smooth_snow_depth: true
              smooth_filter_width_m: 25000.0
              exception_on_error: True
-
+             winter_density: 330.
+             spring_density: 310.
+             summer_density: 360.
+             autumn_density: 350.
+             snow_density_uncertainty: 50.
+             snow_density: seasonal_density_fons_2023
 
 # --- Level-2 processor steps ---
 # 
@@ -278,13 +282,13 @@ procsteps:
     #            fyi_density: 35.7
     #            myi_density: 23.0
     -   module: sit
-        pyclass: seasonalSeaIceDensity
+        pyclass: SeasonalSouthernSeaIceDensity
         options:
             winter_density: 920.0  # TODO check
             spring_density: 915.0
             summer_density: 875.0
             autumn_density: 900.0
-            uncertainty: 20.0
+            uncertainty_fixed_value: 20.
 
     # Algorithm for getting sea ice thickness from other l2 parameters
     -   module: sit

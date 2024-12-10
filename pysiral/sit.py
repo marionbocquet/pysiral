@@ -83,14 +83,14 @@ class AlexandrovSeaIceDensity(Level2ProcessorStep):
     def error_bit(self):
         return self.error_flag_bit_dict["sit"]
 
-class seasonalSeaIceDensity(Level2ProcessorStep):
+class SeasonalSouthernSeaIceDensity(Level2ProcessorStep):
     """
     A Level-2 processor step that adds sea ice density and sea ice density uncertainty 
     considering seasonal values to the L2 data object based on the time of the year
     """
 
     def __init__(self, *args, **kwargs):
-        super(seasonalSeaIceDensity, self).__init__(*args, **kwargs)
+        super(SeasonalSouthernSeaIceDensity, self).__init__(*args, **kwargs)
 
     def execute_procstep(self, l1b, l2):
         """
@@ -149,7 +149,6 @@ class seasonalSeaIceDensity(Level2ProcessorStep):
 
         # Done
         return error_status
-
     @property
     def l2_input_vars(self):
         return ["sitype"]
@@ -161,7 +160,6 @@ class seasonalSeaIceDensity(Level2ProcessorStep):
     @property
     def error_bit(self):
         return self.error_flag_bit_dict["sit"]
-
 
 class SeaIceFreeboard2SIT(Level2ProcessorStep):
     """

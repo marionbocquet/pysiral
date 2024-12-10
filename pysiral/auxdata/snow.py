@@ -43,6 +43,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+import pandas as pd
 import numpy as np
 from loguru import logger
 from pyproj import Proj
@@ -624,6 +625,7 @@ class Warren99AMSR2ClimDataContainer(object):
                 [2, 15],
                 [3, 15],
                 [4, 30]]   # April 30th (to get full coverage of April)
+            
 
 
 class SeasonalArcticSnowDensityMallett2020(AuxdataBaseClass):
@@ -753,15 +755,18 @@ class FixedSnowDepthDensity(AuxdataBaseClass):
         self.register_auxvar("sdens", "snow_density", snow.density, snow.density_uncertainty)
 
 
+
 class ICDCSouthernClimatology(AuxdataBaseClass):
     """ Class for daily climatology fields from UHH ICDC """
 
     def __init__(self, *args, **kwargs):
         super(ICDCSouthernClimatology, self).__init__(*args, **kwargs)
         self._data = None
-
+        
     def get_l2_track_vars(self, l2):
 
+
+        
         # Set the requested data
         self.set_requested_date_from_l2(l2)
 
@@ -800,12 +805,48 @@ class ICDCSouthernClimatology(AuxdataBaseClass):
             snow = SnowParameterContainer()
             snow.depth = sd
             snow.depth_uncertainty = sd_unc
-            snow.density = np.full(sd.shape, self.cfg.options.snow_density)
-            snow.density_uncertainty = np.full(sd.shape, self.cfg.options.snow_density_uncertainty)
-
-        # Register Variables
-        self.register_auxvar("sd", "snow_depth", snow.depth, snow.depth_uncertainty)
-        self.register_auxvar("sdens", "snow_density", snow.density, snow.density_uncertainty)
+            
+            if type(self.cfg.options.snow_density) == int:
+                snow.density = np.full(sd.shape, self.cfg.options.snow_density_uncertainty)
+                snow.density_uncertainty = np.full(sd.shape, self.cfg.options.snow_density_uncertainty)
+            elif self.cfg.options.snow_density == 'seasonal_density_fons_2023':
+                rho_s_winter = self.cfg.options.winter_density
+                rho_s_spring = self.cfg.options.spring_density
+                rho_s_summer = self.cfg.options.summer_density
+                rho_s_autumn = self.cfg.options.autumn_density
+        
+                # Scales with MYI fraction
+                data_seasons = {
+                    "date": ["15-07", "15-10", "15-01", "15-04", "15-07"],
+                    "density": [rho_s_winter, rho_s_spring, rho_s_summer, rho_s_autumn, rho_s_winter],
+                }
+                l2_dates = pd.to_datetime(l2.time)
+                start_year = l2_dates.min().year - 1
+                end_year = l2_dates.max().year + 1
+                season_dates = []
+                for year in range(start_year, end_year + 1):
+                    for season in data_seasons["date"]:
+                        season_date = pd.to_datetime(f"{year}-{season}", format="%Y-%d-%m")
+                        season_dates.append(season_date)
+                    
+                season_series = pd.Series(data_seasons["density"] * (end_year - start_year + 1), index=season_dates)
+                season_series = season_series[~season_series.index.duplicated(keep='first')].sort_index()
+                sdens = np.interp(l2_dates, season_series.index, season_series.values)
+            
+                # Get the snow density uncertainty
+                if "snow_density_uncertainty" in self.cfg.options:
+                    static_sdens_unc = self.cfg.options.snow_density_uncertainty
+                else:
+                    msg = ": Warning - snow_density_uncertainty missing in processor definition (set to 0.0)"
+                    self.add_handler_message(self.__class__.__name__ + msg)
+                    static_sdens_unc = 0.0
+                    
+                snow.density = sdens
+                snow.density_uncertainty = np.full(sd.shape, static_sdens_unc)
+            
+            # Register Variables
+            self.register_auxvar("sd", "snow_depth", snow.depth, snow.depth_uncertainty)
+            self.register_auxvar("sdens", "snow_density", snow.density, snow.density_uncertainty)
 
     def load_requested_auxdata(self):
         """ Loads file from local repository only if needed """
