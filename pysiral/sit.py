@@ -6,7 +6,8 @@ Created on Mon Apr 25 17:15:39 2016
 """
 
 import numpy as np
-
+import pandas as pd
+import datetime
 from pysiral.l2proc.procsteps import Level2ProcessorStep
 
 
@@ -110,14 +111,27 @@ class SeasonalSouthernSeaIceDensity(Level2ProcessorStep):
         rho_i_spring = self.cfg.options.spring_density
         rho_i_summer = self.cfg.options.summer_density
         rho_i_autumn = self.cfg.options.autumn_density
-        data = {
-            "date": ["15-07", "15-10", "15-01", "15-04"], 
-            "density": [rho_i_winter, rho_i_spring, rho_i_summer, rho_i_autumn],
-            }
 
         # Scales with MYI fraction
+        data_seasons = {
+            "date": ["15-07", "15-10", "15-01", "15-04", "15-07"],
+            "density": [rho_i_winter, rho_i_spring, rho_i_summer, rho_i_autumn, rho_i_winter],
+            }
+        l2_dates = pd.to_datetime(l2.time)
+        start_year = l2_dates.min().year - 1
+        end_year = l2_dates.max().year + 1
+        season_dates = []
+        for year in range(start_year, end_year + 1):
+            for season in data_seasons["date"]:
+                season_date = pd.to_datetime(f"{year}-{season}", format="%Y-%d-%m")
+                season_dates.append(season_date)
+
+        season_series = pd.Series(data_seasons["density"] * (end_year - start_year + 1), index=season_dates)
+        season_series = season_series[~season_series.index.duplicated(keep='first')].sort_index()
+        rho_i = np.interp(l2_dates, season_series.index, season_series.values)
+
+        # Test with : desired_index = pd.date_range('2015-01-10', periods=10, freq='1D')
         
-        rho_i = 2
 
         # Compute uncertainty of sea ice density
         # Note: it has been decided to use a simplified computation of
@@ -132,10 +146,10 @@ class SeasonalSouthernSeaIceDensity(Level2ProcessorStep):
         # myi_fraction uncertainty, the sea ice density uncertainty is
         # slightly increased in regions of higher myi_fraction uncertainty
         if "uncertainty" in self.cfg.options:
-            unc = self.cfg.options.uncertainty
-            rho_i_unc = unc.fyi_density
-            rho_i_unc += myi_fraction * (unc.myi_density - unc.fyi_density)
-            rho_i_unc += (unc.fyi_density - unc.myi_density) * myi_fraction.uncertainty
+            rho_i_unc = self.cfg.options.uncertainty
+            #rho_i_unc = unc.fyi_density
+            #rho_i_unc += myi_fraction * (unc.myi_density - unc.fyi_density)
+            #rho_i_unc += (unc.fyi_density - unc.myi_density) * myi_fraction.uncertainty
 
         # Use fixed value for uncertainty (or 0 if unspecified)
         else:
