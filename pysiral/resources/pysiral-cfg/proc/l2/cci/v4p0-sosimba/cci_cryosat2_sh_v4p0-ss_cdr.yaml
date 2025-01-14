@@ -1,10 +1,10 @@
 metadata:
     label: "ESA CCI+ CryoSat-2 southern hemisphere sea-ice thickness climate data record"
-    product_line: cci
+    product_line: SOSIMBA
     record_type: cdr
     platform: cryosat2
-    version: v4p0-preview1
-    file_version_tag: v4p0-preview1
+    version: v4p0-preview1-ss
+    file_version_tag: v4p0-preview.1-ss
     hemisphere: south
 
 

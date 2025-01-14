@@ -1,10 +1,10 @@
 metadata:
     label: "ESA CCI+ Sentinel-3 southern hemisphere sea-ice thickness climate data record v4.0-preview.1"
-    product_line: cci
+    product_line: SOSIMBA
     record_type: cdr
     platform: sentinel3b
-    version: v4p0-preview1
-    file_version_tag: "v4p0-preview.1"
+    version: v4p0-preview1-ss
+    file_version_tag: "v4p0-preview.1-ss"
     hemisphere: south
 
 # --- Ingest auxiliary data ---
@@ -46,14 +46,26 @@ auxdata:
          options:
              uncertainty_default: 0.1
 
+    #- snow:
+    #     name: icdc_climatology_south
+    #     options:
+    #         snow_density: 300.
+    #         snow_density_uncertainty: 50.
+    #         smooth_snow_depth: true
+    #         smooth_filter_width_m: 25000.0
+    #         exception_on_error: True
     - snow:
          name: icdc_climatology_south
          options:
-             snow_density: 300.
-             snow_density_uncertainty: 50.
              smooth_snow_depth: true
              smooth_filter_width_m: 25000.0
              exception_on_error: True
+             winter_density: 330.
+             spring_density: 310.
+             summer_density: 360.
+             autumn_density: 350.
+             snow_density_uncertainty: 50.
+             snow_density: seasonal_density_fons_2023
 
 
 # --- Level-2 processor steps ---
