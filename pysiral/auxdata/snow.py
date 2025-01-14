@@ -806,7 +806,7 @@ class ICDCSouthernClimatology(AuxdataBaseClass):
             snow.depth = sd
             snow.depth_uncertainty = sd_unc
             
-            if type(self.cfg.options.snow_density) == int:
+            if type(self.cfg.options.snow_density) == float:
                 snow.density = np.full(sd.shape, self.cfg.options.snow_density_uncertainty)
                 snow.density_uncertainty = np.full(sd.shape, self.cfg.options.snow_density_uncertainty)
             elif self.cfg.options.snow_density == 'seasonal_density_fons_2023':

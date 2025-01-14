@@ -796,7 +796,7 @@ class L1PTrailingEdgeProperties(L1PProcItem):
         logger.debug(f"- Trailing edge properties computed in {timer.get_seconds():.3f} seconds")
         logger.debug(f"- Trailing edge decay fit as failed for {result.params.decay_fit_has_failed.sum()} waveforms")
 
-        breakpoint()
+        #breakpoint()
 
         l1.classifier.add(result.params.ted, "trailing_edge_decay")
         l1.classifier.add(result.params.tedfq, "trailing_edge_decay_fit_quality")
