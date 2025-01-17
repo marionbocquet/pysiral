@@ -1,11 +1,11 @@
 # Level-2 processor settings for CCI+ Northern hemisphere CRDP v3.0-preview-1
 metadata:
     label: "ESA CCI+ Envisat southern hemisphere sea-ice thickness climate data record v3.0"
-    product_line: cci
+    product_line: SOSIMBA
     record_type: cdr
     platform: envisat
-    version: v3p0
-    file_version_tag: v3p0
+    version: v3p0-ss
+    file_version_tag: v3p0-ss
     hemisphere: south
 
 
@@ -36,19 +36,31 @@ auxdata:
          options: 
              uncertainty_default: 0.1
 
+    #- snow:
+    #     name: icdc_climatology_south
+    #     options:
+    #         snow_density: 300.
+    #         snow_density_uncertainty: 50.
+    #         smooth_snow_depth: true
+    #         smooth_filter_width_m: 25000.0
+    #         exception_on_error: True
+    #   winter: 330.0  # TODO check
+    #   spring: 310.0
+    #   summer: 360.0
+    #   autumn: 350.0
+
     - snow:
          name: icdc_climatology_south
          options:
-             snow_density: 
-                winter: 330.0  # TODO check
-                spring: 310.0
-                summer: 360.0
-                autumn: 350.0
-             snow_density_uncertainty: 50. #TODO check
              smooth_snow_depth: true
              smooth_filter_width_m: 25000.0
              exception_on_error: True
-
+             winter_density: 330.
+             spring_density: 310.
+             summer_density: 360.
+             autumn_density: 350.
+             snow_density_uncertainty: 50.
+             snow_density: seasonal_density_fons_2023
     # Ingest machine learned models
     - ml:
             # category.name (ml.tfmra_threshold_model) points to the corresponding 
@@ -291,16 +303,14 @@ procsteps:
     #            fyi_density: 35.7
     #            myi_density: 23.0
     -   module: sit
-        pyclass: seasonalSeaIceDensity
+        pyclass: SeasonalSouthernSeaIceDensity
         options:
-            winter: 920.0  # TODO check
-            spring: 915.0
-            summer: 875.0
-            autumn: 900.0
-            uncertainty: # set properly the uncertainties
-                fyi_density: 35.7
-                myi_density: 23.0
-
+            winter_density: 920.0  # TODO check
+            spring_density: 915.0
+            summer_density: 875.0
+            autumn_density: 900.0
+            uncertainty_fixed_value: 20.
+    
     # Algorithm for getting sea ice thickness from other l2 parameters
     -   module: sit
         pyclass: SeaIceFreeboard2SIT
