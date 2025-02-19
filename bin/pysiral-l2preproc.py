@@ -16,7 +16,8 @@ from pysiral.core.config import DefaultCommandLineArguments
 from pysiral.core.datahandler import L2iDataHandler
 from pysiral.core.errorhandler import ErrorStatus
 from pysiral.l2preproc import (Level2PreProcessor,
-                               Level2PreProcProductDefinition)
+                               Level2PreProcProductDefinition,
+                               Level2Procauxdef)
 
 
 def pysiral_l2preproc():
@@ -50,6 +51,8 @@ def pysiral_l2preproc():
             doi=args.doi,
             overwrite_protection=args.overwrite_protection)
 
+    proc_options = Level2Procauxdef.from_yaml(args._args.l2_settings)
+
     # Prepare DataHandler
     # The l2 pre-processor requires l2i input files
     l2i_handler = L2iDataHandler(args.l2i_product_dir)
@@ -67,7 +70,7 @@ def pysiral_l2preproc():
     # Processor Initialization
     # NOTE: This is only for later cases. Not much is done here at this
     #       point
-    l2preproc = Level2PreProcessor(product_def)
+    l2preproc = Level2PreProcessor(product_def, proc_options)
 
 #    # Loop over iterations (one per day)
     for day in days:
@@ -140,6 +143,7 @@ class Level2PreProcArgParser(DefaultLoggingClass):
             ("-start", "date", "start_date", False),
             ("-stop", "date", "stop_date", False),
             ("-l2i-product-dir", "l2i-product-dir", "l2i_product_dir", True),
+            ("-l2-settings", "l2-settings", "l2_settings", True),
             ("-l2p-output", "l2p-output", "l2p_output", False),
             ("-exclude-month", "exclude-month", "exclude_month", False),
             ("-doi", "doi", "doi", False),
@@ -187,6 +191,20 @@ class Level2PreProcArgParser(DefaultLoggingClass):
     @property
     def overwrite_protection(self):
         return self._args.overwrite_protection
+
+
+    @property
+    def l2_settings(self):
+        l2_settings = self._args.l2_settings
+        filename = self.pysiral_config.get_settings_file("proc", "l2p", l2_settings)
+        if filename is not None:
+            return filename
+        msg = "Invalid l2 settings filename or id: %s\n" % l2_settings
+        msg = msg + " \nRecognized Level-2 processor setting ids:\n"
+        for l2_settings_id in self.pysiral_config.get_setting_ids("proc", "l2"):
+            msg = f'{msg}  {l2_settings_id}' + "\n"
+        self.error.add_error("invalid-l2-settings", msg)
+        self.error.raise_on_error()
 
     @property
     def l2i_product_dir(self):
