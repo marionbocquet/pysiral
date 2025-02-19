@@ -7,6 +7,7 @@ Created on Sat Apr 23 15:30:53 2016
 
 from dataclasses import dataclass
 from typing import List, Tuple, Union
+import sys
 
 import bottleneck as bn
 import matplotlib.pyplot as plt
@@ -15,12 +16,12 @@ import statsmodels.api as sm
 from astropy.convolution import Box1DKernel, convolve
 from loguru import logger
 from scipy.interpolate import UnivariateSpline, interp1d
+from scipy.signal import butter, filtfilt
 
 from pysiral.core.flags import ANDCondition, FlagContainer, ORCondition
 from pysiral.l1data import Level1bData
 from pysiral.l2data import Level2Data
 from pysiral.l2proc.procsteps import Level2ProcessorStep
-
 
 class L1bEnvisatBackscatterDriftCorrection(Level2ProcessorStep):
     """
@@ -428,8 +429,10 @@ class MarginalIceZoneFilterFlag(Level2ProcessorStep):
                 l2.get_parameter_by_name("distance_to_ocean"),
                 l2.get_parameter_by_name("distance_to_low_ice_concentration"),
                 l2.footprint_spacing]
-        filter_flag, _ = self.get_miz_filter_flag(*args)
+        filter_flag, spurious_flag, _ = self.get_miz_filter_flag(*args)
         l2.set_auxiliary_parameter("fmiz", "flag_miz", filter_flag, None)
+        l2.set_auxiliary_parameter("fmiz_spurious", "flag_miz_spurious", spurious_flag, None)
+
         return filter_flag_miz_error
 
     def get_miz_filter_flag(self,
@@ -441,7 +444,7 @@ class MarginalIceZoneFilterFlag(Level2ProcessorStep):
                             distance_to_ocean: np.ndarray,
                             distance_to_low_ice_concentration: np.ndarray,
                             footprint_spacing: float,
-                            ) -> Tuple[np.ndarray, Union[None, List["MarginalIceZoneFilterData"]]]:
+                            ) -> Tuple[np.ndarray, np.ndarray, Union[None, List["MarginalIceZoneFilterData"]]]:
         """
         Compute the filter flag
 
@@ -478,10 +481,119 @@ class MarginalIceZoneFilterFlag(Level2ProcessorStep):
                 pulse_peakiness_rolling_sdev
         )
 
+
         # Merge the two filter_flags
         filter_flag = np.maximum(filter_flag_01, filter_flag_02)
 
-        return filter_flag, miz_segments
+        spurious_flag = self.get_miz_spurious_values(
+            leading_edge_width,
+            sea_ice_concentration,
+            sea_ice_freeboard,
+            distance_to_ocean,
+            footprint_spacing)
+
+        return filter_flag, spurious_flag, miz_segments
+    
+    def get_miz_spurious_values(self, leading_edge_width,
+                                sea_ice_concentration,
+                                sea_ice_freeboard,
+                                distance_to_ocean,
+                                footprint_spacing
+                                ):
+        
+        # Get the initial filter_flag
+        filter_flag = np.full(sea_ice_freeboard.shape[0], -1, dtype=int)
+
+        # Step 1: Detect ice edge(s) in the trajectory data.
+        ice_edge_segments = self.get_marginal_ice_zone_segments(
+            sea_ice_concentration,
+            distance_to_ocean,
+            footprint_spacing
+        )
+        if ice_edge_segments is None:
+            return filter_flag, ice_edge_segments
+
+        # Step 2: Loop over the ice edge(s) and compute the filter flag
+        miz_segments = []
+        for ice_edge_segment in ice_edge_segments:
+
+            ice_edge_idx, sea_ice_is_left, ocean_idxs, sea_ice_idxs = ice_edge_segment
+
+            # Step 3 : Look over the pass interp where is nan but not at the begining and the end of the pass
+
+            fb_interp = np.copy(sea_ice_freeboard)
+            if np.isnan(sea_ice_freeboard).all()==True:
+                sys.exit("All values are nans")
+            first_valid_index = np.where(~np.isnan(sea_ice_freeboard))[0][0]
+            last_valid_index = np.where(~np.isnan(sea_ice_freeboard))[0][-1]
+            
+            nans = np.isnan(fb_interp[first_valid_index:last_valid_index+1])
+            fb_interp[first_valid_index:last_valid_index+1][nans] = np.interp(np.flatnonzero(nans), 
+                                                                            np.flatnonzero(~nans), 
+                                                                            fb_interp[first_valid_index:last_valid_index+1][~nans])
+
+            fs = 1/20 # acquisition frequency
+            cutoff_frequency = 0.0002 # frequency to cut
+            fb_lp = np.copy(sea_ice_freeboard)
+            fb_lp[first_valid_index:last_valid_index+1] = lowpass_filter(fb_interp[first_valid_index:last_valid_index+1], cutoff_frequency, fs)
+
+            fb_lp_grad = np.ediff1d(fb_lp)
+            fb_lp_grad = np.insert(fb_lp_grad, 0, np.nan)
+            fb_lp_grad_grad = np.ediff1d(fb_lp_grad)
+            fb_lp_grad_grad = np.insert(fb_lp_grad_grad, 0, np.nan)
+
+            grad_local_extrema = np.where(np.diff(np.sign(fb_lp_grad_grad)) != 0)[0] ##
+            grad_local_minima = [i for i in grad_local_extrema if fb_lp_grad[i] < fb_lp_grad[i - 1] and fb_lp_grad[i] < fb_lp_grad[i + 1]] ##
+            grad_local_maxima = [i for i in grad_local_extrema if fb_lp_grad[i] > fb_lp_grad[i - 1] and fb_lp_grad[i] > fb_lp_grad[i + 1]] ##
+            grad_local_minima_re = grad_local_minima.copy()[::-1]
+            grad_local_maxima_re = grad_local_maxima.copy()[::-1]
+
+            
+
+            if not sea_ice_is_left:
+                if len(grad_local_minima) != 0:
+
+                    if fb_lp_grad[grad_local_minima[0]]> -2.5/500:
+                        first_min_min = grad_local_minima[0]
+                    else:
+                        first_min_min = grad_local_minima[1]
+
+                    # look to others minimas
+                    if fb_lp_grad[first_min_min]<0:
+                        for i in grad_local_minima[1:]:
+                            if (fb_lp_grad[i] < fb_lp_grad[first_min_min]):
+                                first_min_min = i
+                            else:
+                                break
+
+
+                    # Find next extremum after this minimum
+                    next_extrema_min_min = next((i for i in grad_local_maxima if i > first_min_min and fb_lp_grad[i] > 0), None)
+                    filter_flag[0:next_extrema_min_min] = 3
+                
+            else :
+                if len(grad_local_maxima) != 0:
+                    if fb_lp_grad[grad_local_minima[0]]< 2.5/500:
+                        first_max_max = grad_local_maxima_re[0]
+                    else:
+                        first_max_max = grad_local_maxima_re[1]
+
+                    # look to others maximax
+                    if fb_lp_grad[first_max_max]>0:
+                        for i in grad_local_maxima_re[1:]:
+                            if (fb_lp_grad[i] > fb_lp_grad[first_max_max]):
+                                first_max_max = i
+                            else:
+                                break
+
+
+                    # Find next extremum after this minimum
+                    next_extrema_max_max = next((i for i in grad_local_minima_re if i < first_max_max and fb_lp_grad[i] < 0), None)
+                    filter_flag[next_extrema_max_max::] = 3
+
+
+
+        return filter_flag
 
     def get_miz_filter_flag_ice_edge_transition(
             self,
@@ -847,6 +959,8 @@ class MarginalIceZoneFilterFlag(Level2ProcessorStep):
         filter_flag[miz_threshold_filter.indices] = 2
         return filter_flag
 
+
+
     @staticmethod
     def get_default_filter_flag(n_records: int) -> np.ndarray:
         return np.full(n_records, -1)
@@ -881,6 +995,14 @@ def astropy_smooth(x, window, **kwargs):
     kernel = Box1DKernel(window)
     return convolve(x, kernel, **kwargs)
 
+
+
+def lowpass_filter(data, cutoff_frequency, fs, order=5):
+    nyquist = 0.5 * fs
+    normal_cutoff = cutoff_frequency / nyquist
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    filtered_data = filtfilt(b, a, data)
+    return filtered_data
 
 def interp1d_gap_filling(y: np.ndarray, **interp_kwargs) -> np.ndarray:
     """

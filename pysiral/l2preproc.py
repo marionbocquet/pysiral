@@ -10,7 +10,7 @@ from collections import OrderedDict
 from pathlib import Path
 
 from loguru import logger
-
+import numpy as np
 from pysiral import psrlcfg
 from pysiral.core import DefaultLoggingClass
 from pysiral.core.errorhandler import ErrorStatus
@@ -48,6 +48,12 @@ class Level2PreProcessor(DefaultLoggingClass):
                 msg %= (ex, Path(l2i_file).name)
                 logger.error(msg)
                 continue
+
+            
+            sum_flag_miz = l2i.flag_miz + l2i.flag_miz_spurious
+            idx = np.where(sum_flag_miz==5)[0]
+            l2i.sea_ice_thickness[idx] = np.nan
+            
             l2p.append_l2i(l2i)
 
         # Merge the l2i object to a single L2Data object
