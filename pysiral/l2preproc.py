@@ -73,11 +73,12 @@ class Level2PreProcessor(DefaultLoggingClass):
                 l2i.distance_to_low_ice_concentration,
                 spacing]
             
-            miz = MarginalIceZoneFilterFlag(self._job._auxproc.procsteps)
-            filter_flag, spurious_flag, _ = miz.get_miz_filter_flag(*args)
-            sum_flag_miz = l2i.flag_miz + spurious_flag
-            idx = np.where(sum_flag_miz==5)[0]
-            l2i.sea_ice_thickness[idx] = np.nan
+            if  not np.isnan(l2i.sea_ice_freeboard).all() == True:
+                miz = MarginalIceZoneFilterFlag(self._job._auxproc.procsteps)
+                filter_flag, spurious_flag, _ = miz.get_miz_filter_flag(*args)
+                sum_flag_miz = l2i.flag_miz + spurious_flag
+                idx = np.where(sum_flag_miz==5)[0]
+                l2i.sea_ice_thickness[idx] = np.nan
             
             l2p.append_l2i(l2i)
 

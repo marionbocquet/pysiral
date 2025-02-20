@@ -535,61 +535,61 @@ class MarginalIceZoneFilterFlag(Level2ProcessorStep):
             fs = 1/20 # acquisition frequency
             cutoff_frequency = 0.0002 # frequency to cut
             fb_lp = np.copy(sea_ice_freeboard)
-            fb_lp[first_valid_index:last_valid_index+1] = lowpass_filter(fb_interp[first_valid_index:last_valid_index+1], cutoff_frequency, fs)
+            if fb_interp[first_valid_index:last_valid_index+1].shape[0] > 18: 
+                fb_lp[first_valid_index:last_valid_index+1] = lowpass_filter(fb_interp[first_valid_index:last_valid_index+1], cutoff_frequency, fs)
 
-            fb_lp_grad = np.ediff1d(fb_lp)
-            fb_lp_grad = np.insert(fb_lp_grad, 0, np.nan)
-            fb_lp_grad_grad = np.ediff1d(fb_lp_grad)
-            fb_lp_grad_grad = np.insert(fb_lp_grad_grad, 0, np.nan)
+                fb_lp_grad = np.ediff1d(fb_lp)
+                fb_lp_grad = np.insert(fb_lp_grad, 0, np.nan)
+                fb_lp_grad_grad = np.ediff1d(fb_lp_grad)
+                fb_lp_grad_grad = np.insert(fb_lp_grad_grad, 0, np.nan)
 
-            grad_local_extrema = np.where(np.diff(np.sign(fb_lp_grad_grad)) != 0)[0] ##
-            grad_local_minima = [i for i in grad_local_extrema if fb_lp_grad[i] < fb_lp_grad[i - 1] and fb_lp_grad[i] < fb_lp_grad[i + 1]] ##
-            grad_local_maxima = [i for i in grad_local_extrema if fb_lp_grad[i] > fb_lp_grad[i - 1] and fb_lp_grad[i] > fb_lp_grad[i + 1]] ##
-            grad_local_minima_re = grad_local_minima.copy()[::-1]
-            grad_local_maxima_re = grad_local_maxima.copy()[::-1]
+                grad_local_extrema = np.where(np.diff(np.sign(fb_lp_grad_grad)) != 0)[0] ##
+                grad_local_minima = [i for i in grad_local_extrema if fb_lp_grad[i] < fb_lp_grad[i - 1] and fb_lp_grad[i] < fb_lp_grad[i + 1]] ##
+                grad_local_maxima = [i for i in grad_local_extrema if fb_lp_grad[i] > fb_lp_grad[i - 1] and fb_lp_grad[i] > fb_lp_grad[i + 1]] ##
+                grad_local_minima_re = grad_local_minima.copy()[::-1]
+                grad_local_maxima_re = grad_local_maxima.copy()[::-1]
 
-            
-
-            if not sea_ice_is_left:
-                if len(grad_local_minima) != 0:
-
-                    if fb_lp_grad[grad_local_minima[0]]> -2.5/500:
-                        first_min_min = grad_local_minima[0]
-                    else:
-                        first_min_min = grad_local_minima[1]
-
-                    # look to others minimas
-                    if fb_lp_grad[first_min_min]<0:
-                        for i in grad_local_minima[1:]:
-                            if (fb_lp_grad[i] < fb_lp_grad[first_min_min]):
-                                first_min_min = i
-                            else:
-                                break
-
-
-                    # Find next extremum after this minimum
-                    next_extrema_min_min = next((i for i in grad_local_maxima if i > first_min_min and fb_lp_grad[i] > 0), None)
-                    filter_flag[0:next_extrema_min_min] = 3
                 
-            else :
-                if len(grad_local_maxima) != 0:
-                    if fb_lp_grad[grad_local_minima[0]]< 2.5/500:
-                        first_max_max = grad_local_maxima_re[0]
-                    else:
-                        first_max_max = grad_local_maxima_re[1]
 
-                    # look to others maximax
-                    if fb_lp_grad[first_max_max]>0:
-                        for i in grad_local_maxima_re[1:]:
-                            if (fb_lp_grad[i] > fb_lp_grad[first_max_max]):
-                                first_max_max = i
-                            else:
-                                break
+                if not sea_ice_is_left:
+                    if len(grad_local_minima) > 1:
+
+                        if fb_lp_grad[grad_local_minima[0]]> -2.5/500:
+                            first_min_min = grad_local_minima[0]
+                        else :
+                            first_min_min = grad_local_minima[1]
+
+                        # look to others minimas
+                        if fb_lp_grad[first_min_min]<0:
+                            for i in grad_local_minima[1:]:
+                                if (fb_lp_grad[i] < fb_lp_grad[first_min_min]):
+                                    first_min_min = i
+                                else:
+                                    break
 
 
-                    # Find next extremum after this minimum
-                    next_extrema_max_max = next((i for i in grad_local_minima_re if i < first_max_max and fb_lp_grad[i] < 0), None)
-                    filter_flag[next_extrema_max_max::] = 3
+                        # Find next extremum after this minimum
+                        next_extrema_min_min = next((i for i in grad_local_maxima if i > first_min_min and fb_lp_grad[i] > 0), None)
+                        filter_flag[0:next_extrema_min_min] = 3
+                    
+                else :
+                    if len(grad_local_maxima) >1 :
+                        if fb_lp_grad[grad_local_maxima_re[0]]< 2.5/500:
+                            first_max_max = grad_local_maxima_re[0]
+                        else:
+                            first_max_max = grad_local_maxima_re[1]
+                        # look to others maximax
+                        if fb_lp_grad[first_max_max]>0:
+                            for i in grad_local_maxima_re[1:]:
+                                if (fb_lp_grad[i] > fb_lp_grad[first_max_max]):
+                                    first_max_max = i
+                                else:
+                                    break
+                    
+                        
+                        # Find next extremum after this minimum
+                        next_extrema_max_max = next((i for i in grad_local_minima_re if i < first_max_max and fb_lp_grad[i] < 0), None)
+                        filter_flag[next_extrema_max_max::] = 3
 
 
 
